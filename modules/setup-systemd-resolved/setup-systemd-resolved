@@ -71,9 +71,7 @@ function install_dependencies {
 
   log_info "Installing dependencies"
   sudo apt-get update -y
-  echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
-  echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
-  sudo apt-get install -y iptables-persistent
+  sudo yum install iptables-services -y
 }
 
 function configure_systemd_resolved {
