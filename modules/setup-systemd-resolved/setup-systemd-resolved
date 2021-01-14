@@ -12,7 +12,7 @@ readonly DEFAULT_CONSUL_DOMAIN="consul"
 readonly DEFAULT_CONSUL_IP="127.0.0.1"
 readonly DEFAULT_CONSUL_DNS_PORT=8600
 
-readonly SYSTEMD_RESVOLDED_CONFIG_FILE="/etc/systemd/resolved.conf"
+readonly SYSTEMD_RESOLVED_CONFIG_FILE="/etc/systemd/resolved.conf"
 
 readonly SCRIPT_NAME="$(basename "$0")"
 
@@ -101,12 +101,11 @@ function configure_systemd_resolved {
 
   sudo iptables -t nat -A OUTPUT -d localhost -p udp -m udp --dport 53 -j REDIRECT --to-ports $consul_port
   sudo iptables -t nat -A OUTPUT -d localhost -p tcp -m tcp --dport 53 -j REDIRECT --to-ports $consul_port
-  sudo sed -i "s/#DNS=/DNS=${consul_ip}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
-  sudo sed -i "s/#Domains=/Domains=~${consul_domain}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
-
   if has_apt_get; then
     sudo iptables-save | sudo tee /etc/iptables/rules.v4
     sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
+    sudo sed -i "s/#DNS=/DNS=${consul_ip}/g" "$SYSTEMD_RESOLVED_CONFIG_FILE"
+    sudo sed -i "s/#Domains=/Domains=~${consul_domain}/g" "$SYSTEMD_RESOLVED_CONFIG_FILE"
   elif has_yum; then
     sudo service iptables save
   else
