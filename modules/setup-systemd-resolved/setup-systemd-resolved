@@ -70,7 +70,7 @@ function install_dependencies {
   local -r consul_ip="$1"
 
   log_info "Installing dependencies"
-  sudo apt-get update -y
+  sudo yum update -y
   sudo yum install iptables-services -y
 }
 
