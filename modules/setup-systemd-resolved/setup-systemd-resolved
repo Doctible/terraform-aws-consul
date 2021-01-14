@@ -66,12 +66,30 @@ function assert_not_empty {
   fi
 }
 
+function has_yum {
+  [ -n "$(command -v yum)" ]
+}
+
+function has_apt_get {
+  [ -n "$(command -v apt-get)" ]
+}
+
 function install_dependencies {
   local -r consul_ip="$1"
 
   log_info "Installing dependencies"
-  sudo yum update -y
-  sudo yum install iptables-services -y
+  if has_apt_get; then
+    sudo apt-get update -y
+    echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
+    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
+    sudo apt-get install -y iptables-persistent
+  elif has_yum; then
+    sudo yum update -y
+    sudo yum install -y iptables-services
+  else
+    log_error "Could not find apt-get or yum. Cannot install dependencies on this OS."
+    exit 1
+  fi
 }
 
 function configure_systemd_resolved {
@@ -79,16 +97,18 @@ function configure_systemd_resolved {
   local -r consul_ip="$2"
   local -r consul_port="$3"
 
-  UBUNTU_VERSION=`lsb_release -s -r`
-  if [ "$UBUNTU_VERSION" == "18.04" ]; then
-    log_info "Configuring systemd-resolved to forward lookups of the '$consul_domain' domain to $consul_ip:$consul_port in $CONSUL_DNS_MASQ_CONFIG_FILE"
+  log_info "Configuring systemd-resolved to forward lookups of the '$consul_domain' domain to $consul_ip:$consul_port in $CONSUL_DNS_MASQ_CONFIG_FILE"
 
-    sudo iptables -t nat -A OUTPUT -d localhost -p udp -m udp --dport 53 -j REDIRECT --to-ports $consul_port
-    sudo iptables -t nat -A OUTPUT -d localhost -p tcp -m tcp --dport 53 -j REDIRECT --to-ports $consul_port
+  sudo iptables -t nat -A OUTPUT -d localhost -p udp -m udp --dport 53 -j REDIRECT --to-ports $consul_port
+  sudo iptables -t nat -A OUTPUT -d localhost -p tcp -m tcp --dport 53 -j REDIRECT --to-ports $consul_port
+  sudo sed -i "s/#DNS=/DNS=${consul_ip}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
+  sudo sed -i "s/#Domains=/Domains=~${consul_domain}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
+
+  if has_apt_get; then
     sudo iptables-save | sudo tee /etc/iptables/rules.v4
     sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
-    sudo sed -i "s/#DNS=/DNS=${consul_ip}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
-    sudo sed -i "s/#Domains=/Domains=~${consul_domain}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
+  elif has_yum; then
+    sudo service iptables save
   else
     log_error "Cannot install on this OS."
     exit 1
